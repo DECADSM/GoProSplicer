@@ -4,6 +4,8 @@
 import os, re, subprocess
 
 isWSL = input("Are we in WSL? ").lower() in ('yes', 'y')
+#make a windows version
+#check if ffmpeg is installed
 
 isInDirectory = input("Are we already in the directory you want? ").lower() in ('yes', 'y')
 
@@ -28,6 +30,10 @@ if not isInDirectory:
     directory = input("Input directory of Go Pro Spilts: ")
     #print(folderSearch(directory, drive))
     os.chdir("/mnt/" + folderSearch(directory, drive).replace("\\", "/").lower().replace(":",""))
+    
+#Ask if the user wants the videos invidviually or a master video(All of them combined)
+MasterVideo = input("Last question, would you like all the go pro videos spliced into a Master Video? ").lower() in ('yes', 'y')
+
 #print(os.getcwd())
 #Get all the files into a list
 allFiles = os.listdir()
@@ -35,44 +41,74 @@ allFiles = os.listdir()
 goProFiles = [f for f in allFiles if any(char in f for char in {'G', 'X'})]
 #print(goProFiles)
 
-#extract the number from the Go Pro file name and sort them
+
+#extract the numbers from the Go Pro file name into 2 groups, the first 2 digits then the last group
 def extractNumber(filename):
-    match = re.search((r'GX(\d+)'), filename)
-    return int(match.group(1)) if match else float('inf')
+    match = re.search((r'GX(\d{2})(\d+)'), filename)
+    return (int(match.group(2)), int(match.group(1)))
     
 sortedGoProFiles = sorted(goProFiles, key=extractNumber)
+#Touple will go (end, beg)
+#print(sortedGoProFiles)
 
 #Group the files that are only 1 number away since they are part of a single video
 grouped = []
 currentGroup = []
-prevNum = None
+prevEndNum = None
+prevBegNum = None
 
 for file in sortedGoProFiles:
-    number = extractNumber(file)
-    if prevNum is None or number == prevNum + 1:
-        currentGroup.append(file)
-    else:
-        grouped.append(currentGroup)
-        currentGroup = [file]
-    prevNum = number
+    filenumber = extractNumber(file) #[0] will be 00NN, [1] will be GX0N
+    #print(file)
+    #print(filenumber)
+    #print(f"prevBegNum as {prevBegNum}, prevEndNum as {prevEndNum} and filenumber as {filenumber}")
+    #print(prevBegNum is None)
+    #if prevBegNum is not None:
+        #print(prevBegNum + 1 == filenumber[1] and prevEndNum == filenumber[0])
+        #print(filenumber[1] == 1)
+        #print(prevEndNum + 1 == filenumber[0])
     
+    if prevBegNum is None:
+        prevBegNum = filenumber[1]
+        prevEndNum = filenumber[0]
+        currentGroup.append(file)
+    elif prevBegNum + 1 == filenumber[1] and prevEndNum == filenumber[0]:
+        prevBegNum = filenumber[1]
+        currentGroup.append(file)
+    elif filenumber[1] == 1 and prevEndNum + 1 == filenumber[0]:
+        prevBegNum = filenumber[1]
+        prevEndNum = filenumber[0]
+        currentGroup.append(file)
+    
+#print(currentGroup)
 if currentGroup:
     grouped.append(currentGroup)
 
-#print(grouped)
+print(grouped)
 
 #Writing files of the groups to splice together with ffmpeg later
 GoProTextFiles = []
-for i, g in enumerate(grouped, start=1):
-    #print(i)
-    #print(g)
-    textFileName = 'VideoList_' + str(i)
-    GoProTextFiles.append(textFileName)
-    with open(textFileName + '.txt', 'w') as f:
-        for name in g:
-            f.write('file ' + name + '\n')
-            print(textFileName + " created")
+textFileName = ''
+if MasterVideo:
+    textFileName = 'MasterVideo'
+    for i, g in enumerate(grouped, start=1):
+        with open(textFileName + '.txt', 'w') as f:
+                for name in g:
+                    f.write('file ' + name + '\n')
+else:
+    for i, g in enumerate(grouped, start=1):
+        #print(i)
+        #print(g)
+        textFileName = 'VideoList_' + str(i)
+        GoProTextFiles.append(textFileName)
+        with open(textFileName + '.txt', 'w') as f:
+            for name in g:
+                f.write('file ' + name + '\n')
+                print(textFileName + " created")
             
 #run ffmpeg command: ffmpeg -f concat -safe 0 -i filelist.txt -c copy output.mp4
-for i in GoProTextFiles:
-    subprocess.run(['ffmpeg', '-f', 'concat', '-safe', '0', '-i', i + '.txt', '-c', 'copy', i + '.mp4'])
+if not MasterVideo:
+    for i in GoProTextFiles:
+        subprocess.run(['ffmpeg', '-f', 'concat', '-safe', '0', '-i', i + '.txt', '-c', 'copy', i + '.mp4'])
+else
+    subprocess.run(['ffmpeg', '-f', 'concat', '-safe', '0', '-i', textFileName + '.txt', '-c', 'copy', i + '.mp4'])
