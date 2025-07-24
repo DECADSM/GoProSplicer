@@ -2,8 +2,16 @@
 #I'm assumming you already know the folder you're working in
 
 import os, re, subprocess
+from CheckLibraryInstallation import CheckLibrary
 
-isWSL = input("Are we in WSL? ").lower() in ('yes', 'y')
+if not CheckLibrary("ffmpeg"):
+    print("Please install ffmpeg to use this script.")
+    quit()
+
+OS = input("What OS are we using? ").lower()
+isWSL = ''
+if "win" in OS:
+    isWSL = input("Are we in WSL? ").lower() in ('yes', 'y')
 #make a windows version
 #check if ffmpeg is installed
 
@@ -110,5 +118,5 @@ else:
 if not MasterVideo:
     for i in GoProTextFiles:
         subprocess.run(['ffmpeg', '-f', 'concat', '-safe', '0', '-i', i + '.txt', '-c', 'copy', i + '.mp4'])
-else
+else:
     subprocess.run(['ffmpeg', '-f', 'concat', '-safe', '0', '-i', textFileName + '.txt', '-c', 'copy', i + '.mp4'])
