@@ -1,10 +1,23 @@
 #this script is meant to concat the go pro splits made from porting the videos onto a machine
 #I'm assumming you already know the folder you're working in
 
-import os, re, subprocess, platform
+import os, re, subprocess, platform, argparse
 from CheckLibraryInstallation import CheckLibrary
+from MasterVideo import MasterVideo
 
-#Use a config file to store the path and/or drive to where the user has their go pro files
+#check for arguments given. 
+#goprosplicer.py (arg), (optional 1), (optional 2)...
+#arg where this will jump the user to the specific function in goprosplicer.
+#Then the optional args are the answers to the prompts. 
+#optional 1 is Directory
+#optional 2 will either be the Master video question or the group of files for the User made group
+
+parser = argparse.ArgumentParser(description = "Splice together Go Pro splits and clips")
+parser.add_argument('directory', nargs='?', type=str, help="Directory where footage is stored")
+parser.add_argument('--master', action='store_true', help="Create Master Video")
+
+#Grab the arguments from parser
+args = parser.parse_args()
 
 #check if ffmpeg is installed
 if not CheckLibrary("ffmpeg"):
@@ -25,30 +38,45 @@ if currentOS == "Linux":
  
 print(f"Detected OS: {currentOS}{' (WSL)' if isWSL else ''}")
 
+if not args.directory: 
+    isInDirectory = input("Are we already in the directory you want? ").lower() in ('yes', 'y')
 
-isInDirectory = input("Are we already in the directory you want? ").lower() in ('yes', 'y')
-
-if not isInDirectory:
-    rawPath = input("Paste the full path to your GoPro splits folder: ").strip()
- 
-    # WSL path conversion:
-    # If the user is on WSL and pastes a Windows-style path like C:\foo\bar,
-    # we need to convert it to the WSL mount format /mnt/c/foo/bar.
-    # We check if it looks like a Windows path (e.g. starts with a drive letter like C:\)
-    # and if /mnt/ isn't already prepended.
+    if not isInDirectory:
+        rawPath = input("Paste the full path to your GoPro splits folder: ").strip()
+     
+        # WSL path conversion:
+        # If the user is on WSL and pastes a Windows-style path like C:\foo\bar,
+        # we need to convert it to the WSL mount format /mnt/c/foo/bar.
+        # We check if it looks like a Windows path (e.g. starts with a drive letter like C:\)
+        # and if /mnt/ isn't already prepended.
+        if isWSL and not rawPath.startswith("/mnt/"):
+            if len(rawPath) >= 2 and rawPath[1] == ":":
+                driveLetter = rawPath[0].lower()
+                remainder = rawPath[2:].replace("\\", "/")
+                rawPath = f"/mnt/{driveLetter}{remainder}"
+                print(f"Converted to WSL path: {rawPath}")
+     
+        os.chdir(rawPath)
+     
+    print(f"Working directory: {os.getcwd()}")
+else:
+    print(args.directory)
+    rawPath = args.directory.strip()
     if isWSL and not rawPath.startswith("/mnt/"):
         if len(rawPath) >= 2 and rawPath[1] == ":":
-            driveLetter = rawPath[0].lower()
-            remainder = rawPath[2:].replace("\\", "/")
-            rawPath = f"/mnt/{driveLetter}{remainder}"
-            print(f"Converted to WSL path: {rawPath}")
- 
-    os.chdir(rawPath)
- 
-print(f"Working directory: {os.getcwd()}")
-    
-#Ask if the user wants the videos invidviually or a master video(All of them combined)
-MasterVideo = input("Last question, would you like all the go pro videos spliced into a Master Video? ").lower() in ('yes', 'y')
+                driveLetter = rawPath[0].lower()
+                remainder = rawPath[2:].replace("\\", "/")
+                rawPath = f"/mnt/{driveLetter}{remainder}"
+                print(f"Converted to WSL path: {rawPath}")
+     
+        os.chdir(rawPath)
+
+
+if not args.master:
+    #Ask if the user wants the videos invidviually or a master video(All of them combined)
+    MasterVideo = input("Last question, would you like all the go pro videos spliced into a Master Video? ").lower() in ('yes', 'y')
+else:
+    MasterVideo = args.master
 
 #print(os.getcwd())
 #Get all the files into a list
